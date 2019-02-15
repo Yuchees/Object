@@ -1,2 +1,2 @@
 # Object
-# Yu Che
+### Gaussian.py Gaussia16 functions
