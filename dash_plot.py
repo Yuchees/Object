@@ -197,13 +197,11 @@ def update_graph(plot_type_value, x_axis_column_name, y_axis_column_name,
             )],
             'layout': go.Layout(
                 height=800,
-                scene=dict(
-                    xaxis={'title': x_axis_column_name, 'zeroline': True},
-                    yaxis={'title': y_axis_column_name, 'zeroline': True},
-                    zaxis={'title': z_axis_column_name, 'zeroline': True},
-                ),
-                margin={'l': 40, 'b': 40, 't': 10, 'r': 0}
-            )
+                scene={'xaxis': {'title': x_axis_column_name, 'zeroline': True},
+                       'yaxis': {'title': y_axis_column_name, 'zeroline': True},
+                       'zaxis': {'title': z_axis_column_name, 'zeroline': True}}
+            ),
+            'margin': {'l': 40, 'b': 40, 't': 10, 'r': 0}
         }
 
 
