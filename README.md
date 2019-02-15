@@ -1,2 +1,4 @@
 # Object
-# Yu Che
+Personal functions and class for Yu's project.
+###* gaussian.py
+A class for Gaussian16 functions.
