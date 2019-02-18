@@ -12,7 +12,7 @@ import pandas as pd
 import pymongo
 import multiprocessing
 
-# Dash format and connecting to mongoDB
+# Dash format and mongoDB connection
 app = dash.Dash('ESF maps')
 client = pymongo.MongoClient('mongodb://138.253.124.96/')
 client.users.authenticate('user1', '1234')
@@ -23,7 +23,7 @@ def read(dic):
     return dic
 
 
-# Retrieval data from mongoDB
+# Data retrieval from mongoDB
 p = multiprocessing.Pool()
 result = p.map(
     read, [item for item in db.ESF.find({'job_number': {'$regex': 'T2*'}})]
@@ -47,7 +47,7 @@ app.layout = html.Div([
                        'color': '#3D4B56'})
     ], className='plot_title', style={'position': 'relative', 'right': '15px'}
     ),
-    # Graph type selection, using dash radio items components
+    # Plot type selection(2D&3D), using dash radio items components
     dcc.Graph(id='indicatorgraphic'),
     dcc.RadioItems(
         id='plot_type',
@@ -107,7 +107,7 @@ app.layout = html.Div([
         )
     ], style={'width': '20%', 'display': 'inline-block'}
     ),
-    # Print text to present data range
+    # Print text to present the range of selected data
     html.Div([
         html.P('Select data range:'),
         dcc.RangeSlider(id='range_slider')
@@ -139,7 +139,7 @@ def select_bar3(range_column_value):
     return [df[range_column_value].min(), df[range_column_value].max()]
 
 
-# Plot graph controlled by dropdown and range slider
+# Plot is controlled by dropdown and range slider.
 @app.callback(
     dash.dependencies.Output('indicatorgraphic', 'figure'),
     [dash.dependencies.Input('plot_type', 'value'),
@@ -152,6 +152,7 @@ def select_bar3(range_column_value):
 def update_graph(plot_type_value, x_axis_column_name, y_axis_column_name,
                  z_axis_column_name, colour_column_value, range_column_value,
                  range_slider_value):
+    # Data range selection
     filtered_df = pd.DataFrame(
         data=df[(df[range_column_value] > range_slider_value[0]) &
                 (df[range_column_value] < range_slider_value[1])]
@@ -205,7 +206,7 @@ def update_graph(plot_type_value, x_axis_column_name, y_axis_column_name,
         }
 
 
-# Print range slider ranges
+# Dash range slider function
 @app.callback(
     dash.dependencies.Output('selected_data', 'children'),
     [dash.dependencies.Input('range_slider', 'value'),
