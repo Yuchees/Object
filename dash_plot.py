@@ -15,27 +15,27 @@ import multiprocessing
 
 parser = ArgumentParser(description='Script to generate a Dash 2D&3D scatter'
                                     'plot of a similarity matrix')
-parser.add_argument('--local-input-data', '-l', dest='InputData',
+parser.add_argument('--local-input-data', '-l', dest='input_data',
                     help='Input data should be a CSV format file.')
-parser.add_argument('--enable-using-local-mongoDB-data', '-db', dest='enableDB',
+parser.add_argument('--enable-mongoDB-data', '-db', dest='enable_db',
                     action='store', default=True,
                     help='Choose weather or not using mongoDB data set.')
-parser.add_argument('--mongoDB-user', '-u', dest='User',
+parser.add_argument('--mongoDB-user', '-u', dest='user',
                     action='store', default='user1',
-                    help='MongoDB user name')
-parser.add_argument('--mongoDB-password', '-p', dest='Password',
+                    help='MongoDB username')
+parser.add_argument('--mongoDB-password', '-p', dest='password',
                     action='store', default='1234',
-                    help='')
-parser.add_argument('--the-plot-title', '-t', dest='Title', action='store',
+                    help='MongoDB password')
+parser.add_argument('--the-plot-title', '-t', dest='title', action='store',
                     default='Dash for ESF maps',
-                    help='')
+                    help='Scatter plot title')
 args = parser.parse_args()
 
 # Data retrieve
-if args.enableDB:
+if args.enable_db:
     # mongoDB client connection
     client = pymongo.MongoClient('mongodb://138.253.124.96/')
-    client.users.authenticate(args.User, args.Password)
+    client.users.authenticate(args.user, args.password)
     db = client.users
 
 
@@ -51,12 +51,12 @@ if args.enableDB:
     p.close()
     df = pd.DataFrame(data=result)
 else:
-    df = pd.DataFrame.from_csv(args.InputData).drop(['Unnamed: 0'], axis=1)
+    df = pd.DataFrame.from_csv(args.input_data).drop(['Unnamed: 0'], axis=1)
 
 data_columns = df.columns
 
 # All HTML elements
-app = dash.Dash('ESF maps')
+app = dash.Dash('2D&3D scatter plot')
 app.layout = html.Div([
     # Dash title and icon
     html.Div([
@@ -64,7 +64,7 @@ app.layout = html.Div([
                      "/logo/new-branding/dash-logo-by-plotly-stripe.png",
                  style={'float': 'right', 'position': 'relative',
                         'height': '60px', 'bottom': '10px', 'left': '20px'}),
-        html.H2('Dash for ESF maps',
+        html.H2(args.title,
                 style={'position': 'relative', 'display': 'inline',
                        'top': '0px', 'left': '10px',
                        'font-family': 'Dosis', 'font-size': '3.0rem',
