@@ -11,8 +11,21 @@ import re
 from datetime import datetime
 
 
+# noinspection PyBroadException
 class GaussianInout:
+    """
+    Gaussian 16 input and output files preparation function.
+    """
     def __init__(self, method, mol, seq, path='../../Documents'):
+        """
+        :param method: DFT method
+        :param mol: Molecule name
+        :param seq: Sequence type
+        :param path: The root path for input and output files
+        :type method: str
+        :type mol: str
+        :type seq: str
+        """
         self.gauss_method = method
         self.mol_group = '{}_{}'.format(mol, seq)
         # Gaussian16 header and barkla bash template
@@ -31,16 +44,32 @@ class GaussianInout:
                          '/chk/{}/{}/'.format(method, mol))
 
     def setup_target_folder(self, folder):
+        """
+        Setting targeted folder path.
+
+        :param folder: The path for targeted folder.
+        :return: None
+        """
         if folder.endswith('/'):
             folder = folder[:-1]
         self.check_target_folder = folder
 
     def setup_chk_path(self, chk_path):
+        """
+        Editing default checkpoint information for input files.
+
+        :param chk_path: The chk line in gaussian header
+        :return: None
+        """
         self.chk_path = chk_path
 
     def info(self, info):
         """
-        Check and print all variables before run any functions.
+        Print variables for different function.
+
+        :param info: One of 'all', 'input', 'neg', 'error' and 'error_input'.
+        :type info: str
+        :return: None
         """
         if info in ['all']:
             print('Gaussian16 {}'.format(self.gauss_method))
@@ -83,12 +112,14 @@ class GaussianInout:
 
     def prep_input(self):
         """
-        Function Documentation
-        Generate gaussian input files.
-        All chemical files must be stored under self.check_target_folder folder.
-        Header information read from self.header file.
+        Generate gaussian input files.\n
+        All chemical files must be stored under self.check_target_folder
+        folder.\n
+        Header information read from self.header file.\n
         Checkpoint file path got from self.chk_path variable and named
         as same as the molecule file.
+
+        :return: None
         """
         print('Processing...')
         start = datetime.now()
@@ -145,7 +176,10 @@ class GaussianInout:
 
     def check_freq(self):
         """
+        Checking the frequency information and distributing negative frequency
+        output files into 'neg_freq' folder.
 
+        :return: None
         """
         print('Targeted folder: {}'.format(self.check_target_folder))
         start = datetime.now()
@@ -180,6 +214,13 @@ class GaussianInout:
         print('Finished. Total time:{}'.format(datetime.now() - start))
 
     def check_error(self):
+        """
+        Checking the output files and distributing error files into different
+        folder.\n
+        Error folders are automatically created and named by the error number.
+
+        :return: None
+        """
         # Checking the error for output files
         print('Targeted folder: {}'.format(self.check_target_folder))
         start = datetime.now()
@@ -202,7 +243,12 @@ class GaussianInout:
         print('Finished. Total time:{}'.format(datetime.now() - start))
 
     def error_or_freq_input(self):
-        # Generating input fies for error and negative frequency results.
+        """
+        Generating input files for error and negative frequency results.\n
+        Using prepared header information.
+
+        :return: None
+        """
         print('Targeted folder: {}'.format(self.check_target_folder))
         start = datetime.now()
         error_list = os.listdir(self.check_target_folder)

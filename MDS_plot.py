@@ -165,6 +165,7 @@ class MdsPlot():
         :type title: str
         :type size: str
         :type colour: str
+        :type tag: tuple
         :return: Plotly figure object.
         """
         tag_list = list(
@@ -256,14 +257,16 @@ class MdsPlot():
 
 
 if __name__ == '__main__':
+    # Test script
     plot = MdsPlot()
     plot.data_retrieve(
-        path='../4EPK/T2.csv', size=(None, 29), descriptor='CH4_Del(65-5.8bar)')
+        path='../4EPK/T2.csv', size=(None, 29), descriptor='CH4_Del(65-5.8bar)'
+    )
     plot.affinity_propagation_cluster()
     plot.cluster_structure_selection(descriptor='Final_lattice_E')
     plot.mds_calculation()
     fig = plot.plot(
         title='T2 MDS plot', size='CH4_Del(65-5.8bar)',
         colour='Final_lattice_E', text='Structure',
-        tag=['job_00014', 'job_00054', 'job_00120', 'job_00186']
+        tag=('job_00014', 'job_00054', 'job_00120', 'job_00186')
     )
