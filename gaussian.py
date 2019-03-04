@@ -1,8 +1,7 @@
 #!/usr/bin/env python3
 # -*- coding: utf-8 -*-
 """
-Created on Wed Dec 19 10:19:00 2018
-
+Gaussian 16 input and output files preparation.
 @author: Yu Che
 """
 import os
@@ -37,7 +36,7 @@ class GaussianInout:
         self.input_folder = '{}/input_{}'.format(path, method)
         self.output_folder = '{}/output_{}'.format(path, method)
         # Error and negative frequency folder
-        self.check_target_folder = ('{}/output_{}/result'.format(path, method))
+        self.check_target_folder = ('{}/result'.format(self.output_folder))
         # Normal terminated results
         self.normal_folder = self.output_folder + '/' + self.mol_group
         self.chk_path = ('%Chk=/users/psyche/volatile/gaussian'
@@ -94,7 +93,6 @@ class GaussianInout:
                     self.normal_folder
                 )
             )
-
         if info in ['all', 'error_input']:
             print(
                 'Error input folder: {}\n'
@@ -230,16 +228,23 @@ class GaussianInout:
                 break
             path = self.check_target_folder + '/' + file
             with open(path, 'r') as gauss_out:
-                error_line = gauss_out.readlines()[-4:-3][0]
-            # Checking the error indicator
-            if error_line.startswith(' Error termination'):
-                error = re.split(r'[/.]', error_line)[-3][1:]
-                # Creating a new folder for different categories of error
-                new_path = self.output_folder + '/error_' + error
-                if not os.path.exists(new_path):
-                    os.mkdir(new_path)
-                    print(new_path)
-                shutil.move(path, new_path)
+                lines = gauss_out.readlines()
+                # Checking the ending line
+                if not re.match(r' File| Normal', lines[-1]):
+                    unfinished = self.check_target_folder + '/../unfinished'
+                    shutil.move(path, unfinished)
+                else:
+                    error_line = lines[-4:-3][0]
+                # Checking the error indicator
+                    if error_line.startswith(' Error termination'):
+                        error = re.split(r'[/.]', error_line)[-3][1:]
+                        # Creating a new folder for different
+                        # categories of error
+                        new_path = self.output_folder + '/error_' + error
+                        if not os.path.exists(new_path):
+                            os.mkdir(new_path)
+                            print(new_path)
+                        shutil.move(path, new_path)
         print('Finished. Total time:{}'.format(datetime.now() - start))
 
     def error_or_freq_input(self):
