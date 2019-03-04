@@ -11,7 +11,7 @@ from sklearn.metrics.pairwise import euclidean_distances
 from sklearn.cluster import AffinityPropagation
 
 
-# noinspection PyRedundantParentheses
+# noinspection PyRedundantParentheses,PyUnboundLocalVariable
 class MdsPlot():
     """
     This class is used to proceed a plot followed with clustering and
@@ -81,7 +81,7 @@ class MdsPlot():
         print('Affinity propagation starting...')
         start = datetime.now()
         af = AffinityPropagation(
-            max_iter=5000, convergence_iter=50, preference=None
+            max_iter=30000, convergence_iter=70, preference=None
         ).fit(self.features)
         cluster_centers_indices = af.cluster_centers_indices_
         df_labels = pd.DataFrame(af.labels_)
@@ -117,12 +117,15 @@ class MdsPlot():
         # Rearrange index
         self.selected_df.index = range(len(self.selected_df))
 
-    def mds_calculation(self):
+    def dim_reduction_calculation(self, method):
         """
-        Using multidimensional scaling for the selected data to calculate
-        2D coordinators. The coordinator information is written in 'pos0' and
-        'pos1' columns.
+        Using non-linear dimensionality reduction method for the selected data
+        to calculate 2D coordinators.
+        The coordinator information is written in 'pos0' and 'pos1' columns.
 
+        :param method: The chosen method for reduction. Supported MDS, t-SNE,
+        isomap and lle.
+        :type method: str
         :return: None
         """
         print('Distance calculation...')
@@ -132,13 +135,31 @@ class MdsPlot():
         scaled_features = MinMaxScaler().fit_transform(features)
         distance = euclidean_distances(scaled_features)
         self.similarities = distance / distance.max()
-        print('Multidimensional scaling starting...')
         seed = np.random.RandomState(seed=0)
-        mds = manifold.MDS(
-            n_components=2, max_iter=30000, random_state=seed,
-            eps=1e-12, dissimilarity="precomputed", n_jobs=1
-        )
-        pos = mds.fit(self.similarities).embedding_
+        if method == 'mds':
+            print('Multidimensional scaling starting...')
+            mds = manifold.MDS(
+                n_components=2, max_iter=30000, random_state=seed,
+                eps=1e-12, dissimilarity="precomputed"
+            )
+            pos = mds.fit(self.similarities).embedding_
+        elif method == 'tsne':
+            tsne = manifold.TSNE(
+                n_components=2, n_iter=30000, random_state=seed,
+                min_grad_norm=1e-12, init='pca'
+            )
+            pos = tsne.fit(scaled_features).embedding_
+        elif method == 'isomap':
+            isomap = manifold.Isomap(
+                n_components=2, n_neighbors=12, max_iter=30000,
+            )
+            pos = isomap.fit(scaled_features).embedding_
+        elif method == 'lle':
+            pos = manifold.locally_linear_embedding(
+                X=scaled_features, n_neighbors=12,
+                n_components=2, max_iter=30000, random_state=seed
+            )
+            pos = pos[0]
         self.pos_df = pd.DataFrame(data=pos, columns=['pos0', 'pos1'])
         self.selected_df = self.selected_df.merge(
             self.pos_df, left_index=True, right_index=True
@@ -150,26 +171,31 @@ class MdsPlot():
             'Total time:{}'.format(datetime.now() - start)
         )
 
-    def plot(self, title, size, colour, tag=(), lines=False, text='Structure'):
+    def plot(self, title, size, color, tag=(), range_line=(),
+             colorscale='RdBu', lines=False, text='Structure'):
         """
         This function is based on plotly API to generate a scatter plot for
-        multidimensional scaling.
+        non-linear dimensionality reduction.
         Using plotly function to generate the plot in notebook.
 
         :param title: The plot title.
         :param text:  The descriptor will be shown in the text part in plot.
         :param size: The name of a descriptor to scale the scatter size.
-        :param colour: The name of a descriptor to scale the colour.
+        :param color: The name of a descriptor to scale the colour.
         :param lines: Enable lines to describe the similarity.
-        :param tag: The name of selected points shown in diamond style.
+        :param tag: The name of selected structures shown in diamond style.
+        :param range_line: The range of length for similarity lines
+        :param colorscale: Sets the colorscale
         :type title: str
         :type size: str
-        :type colour: str
+        :type color: str
         :type tag: tuple
+        :type range_line: tuple
+        :type colorscale: str or list
         :return: Plotly figure object.
         """
         tag_list = list(
-            self.selected_df[self.selected_df.Structure.isin(tag)].index
+            self.selected_df[self.selected_df.Structure.isin(list(tag))].index
         )
         # Plot the network line part:
         if lines:
@@ -187,7 +213,7 @@ class MdsPlot():
             for i in range(n_space):
                 for j in range(n_space):
                     # Limited the line length
-                    if 0.03 < self.similarities[i, j] < 0.15:
+                    if range_line[0] < self.similarities[i, j] < range_line[1]:
                         p1 = [self.pos_df.iloc[i, 0], self.pos_df.iloc[i, 1]]
                         p2 = [self.pos_df.iloc[j, 0], self.pos_df.iloc[j, 1]]
                         segments.append([p1, p2])
@@ -209,8 +235,8 @@ class MdsPlot():
             marker=dict(
                 symbol='circle',
                 size=(8 + self.selected_df.loc[:, size]),
-                color=self.selected_df.loc[:, colour],
-                colorscale='RdBu',
+                color=self.selected_df.loc[:, color],
+                colorscale=colorscale,
                 colorbar=dict(
                     thicknessmode='pixels',
                     thickness=20,
@@ -231,8 +257,8 @@ class MdsPlot():
             marker=dict(
                 symbol='diamond',
                 size=(8 + self.selected_df.loc[:, size]),
-                color=self.selected_df.loc[:, colour],
-                colorscale='RdBu',
+                color=self.selected_df.loc[:, color],
+                colorscale=colorscale,
                 reversescale=True,
                 showscale=False
             )
@@ -252,7 +278,11 @@ class MdsPlot():
             showlegend=False
         )
         # The plot function
-        plot_fig = go.Figure(data=[trace0, trace1], layout=layout)
+        if lines:
+            plot_fig = go.Figure(
+                data=[trace0, trace1, edge_trace], layout=layout)
+        else:
+            plot_fig = go.Figure(data=[trace0, trace1], layout=layout)
         return plot_fig
 
 
@@ -260,13 +290,13 @@ if __name__ == '__main__':
     # Test script
     plot = MdsPlot()
     plot.data_retrieve(
-        path='../4EPK/T2.csv', size=(None, 29), descriptor='CH4_Del(65-5.8bar)'
+        path='../4EPK/T2.csv', size=(None, 23), descriptor='CH4_Del(65-5.8bar)'
     )
     plot.affinity_propagation_cluster()
     plot.cluster_structure_selection(descriptor='Final_lattice_E')
-    plot.mds_calculation()
+    plot.dim_reduction_calculation('lle')
     fig = plot.plot(
         title='T2 MDS plot', size='CH4_Del(65-5.8bar)',
-        colour='Final_lattice_E', text='Structure',
+        color='Final_lattice_E', text='Structure',
         tag=('job_00014', 'job_00054', 'job_00120', 'job_00186')
     )
