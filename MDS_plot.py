@@ -1,6 +1,9 @@
 #!/usr/bin/env python3
 # -*- coding: utf-8 -*-
-
+"""
+Data classification and dimensionality reduction.
+@author: Yu Che
+"""
 import numpy as np
 import pandas as pd
 import plotly.graph_objs as go
@@ -14,29 +17,28 @@ from sklearn.cluster import AffinityPropagation
 # noinspection PyRedundantParentheses,PyUnboundLocalVariable
 class MdsPlot():
     """
-    This class is used to proceed a plot followed with clustering and
+    This class is used to proceed a plot after clustering and
     scaling methods.
     """
     def __init__(self):
         self.df = pd.DataFrame()
         self.data_df = pd.DataFrame()
         self.selected_df = pd.DataFrame()
-        self.descriptor = None
         self.similarities = None
         self.features = None
         self.size = None
         self.pos_df = pd.DataFrame()
 
-    def data_retrieve(self, path, size, descriptor):
+    def data_retrieve(self, path, size, descriptors):
         """
-        Data frame retrieve function.
+        Data set retrieve function.
 
         :param path: The path for input data file.
-        :param size: The range of columns in data frame.
-        :param descriptor: The variable will be used in plot.
+        :param size: The range of columns in data set.
+        :param descriptors: Variables will be used in the plot.
         :type path: str
         :type size: tuple
-        :type descriptor: str
+        :type descriptors: list
         :return: None
         """
         print('Reading data frame...')
@@ -50,20 +52,22 @@ class MdsPlot():
         elif file_format == 'pkl':
             self.df = pd.read_pickle(path)
         else:
-            print('Error! Please input the correct format file.')
+            print('Error! Please select the correct format file.')
             exit()
         # Selecting the range of input data
         self.data_df = self.df.iloc[:, size[0]:size[1]]
-        self.descriptor = pd.DataFrame(
-            self.df[['Structure', 'Final_lattice_E', descriptor]])
         # Delete no numerical data to avoid error in normalization
         for column in self.data_df.columns:
             if self.data_df.dtypes[column] != ('float64' or 'int64'):
                 self.data_df = self.data_df.drop(column, axis=1)
         print('Normalizing...')
         # Normalization
-        data = self.data_df.values
-        self.features = MinMaxScaler().fit_transform(data)
+        self.features = MinMaxScaler().fit_transform(self.data_df.values)
+        # Merge descriptors into data_df
+        self.data_df = self.data_df.merge(
+            pd.DataFrame(self.df[descriptors]), left_index=True,
+            right_index=True
+        )
         print(
             'Finished!\n'
             'Selected data frame: self.data_df\n'
@@ -73,7 +77,7 @@ class MdsPlot():
 
     def affinity_propagation_cluster(self):
         """
-        Using affinity propagation to cluster the data frame. The cluster
+        Using affinity propagation to cluster the data set. The cluster
         information is written in the 'AffinityPropagation' column.
 
         :return: None
@@ -91,8 +95,6 @@ class MdsPlot():
             df_labels, left_index=True, right_index=True
         )
         self.data_df.rename(columns={0: 'AffinityPropagation'}, inplace=True)
-        self.data_df = self.data_df.merge(
-            self.descriptor, left_index=True, right_index=True)
         print(
             'Finished!\n'
             'Estimated number of clusters: {}\n'
@@ -130,14 +132,16 @@ class MdsPlot():
         """
         print('Distance calculation...')
         start = datetime.now()
+        # Selecting the data matrix
         features = self.selected_df.iloc[
                    :, self.size[0]:(self.size[1] - 1)].values
         scaled_features = MinMaxScaler().fit_transform(features)
+        # Distance calculation
         distance = euclidean_distances(scaled_features)
         self.similarities = distance / distance.max()
+        print('Dimensionality reduction starting...')
         seed = np.random.RandomState(seed=0)
         if method == 'mds':
-            print('Multidimensional scaling starting...')
             mds = manifold.MDS(
                 n_components=2, max_iter=30000, random_state=seed,
                 eps=1e-12, dissimilarity="precomputed"
@@ -155,11 +159,11 @@ class MdsPlot():
             )
             pos = isomap.fit(scaled_features).embedding_
         elif method == 'lle':
-            pos = manifold.locally_linear_embedding(
+            lle = manifold.locally_linear_embedding(
                 X=scaled_features, n_neighbors=12,
                 n_components=2, max_iter=30000, random_state=seed
             )
-            pos = pos[0]
+            pos = lle[0]
         self.pos_df = pd.DataFrame(data=pos, columns=['pos0', 'pos1'])
         self.selected_df = self.selected_df.merge(
             self.pos_df, left_index=True, right_index=True
@@ -194,11 +198,14 @@ class MdsPlot():
         :type colorscale: str or list
         :return: Plotly figure object.
         """
+        print('Starting...')
+        start = datetime.now()
         tag_list = list(
             self.selected_df[self.selected_df.Structure.isin(list(tag))].index
         )
-        # Plot the network line part:
+        # Generating the network line part
         if lines:
+            print('Building the line segment...')
             edge_trace = go.Scatter(
                 x=[],
                 y=[],
@@ -217,13 +224,15 @@ class MdsPlot():
                         p1 = [self.pos_df.iloc[i, 0], self.pos_df.iloc[i, 1]]
                         p2 = [self.pos_df.iloc[j, 0], self.pos_df.iloc[j, 1]]
                         segments.append([p1, p2])
-            # Adding each line's coordinates in plot
+            # Adding each line's coordinates into plot
             for edge in segments:
                 x0, y0 = edge[0]
                 x1, y1 = edge[1]
                 edge_trace['x'] += tuple([x0, x1, None])
                 edge_trace['y'] += tuple([y0, y1, None])
         # Scatter plot
+        print('Building the scatter segment...')
+        # Circle points and hiding the selected points
         trace0 = go.Scatter(
             x=self.selected_df.loc[:, 'pos0'],
             y=self.selected_df.loc[:, 'pos1'],
@@ -246,6 +255,7 @@ class MdsPlot():
                 showscale=True
             )
         )
+        # Diamond points and hiding the unselected points
         trace1 = go.Scatter(
             x=self.selected_df.loc[:, 'pos0'],
             y=self.selected_df.loc[:, 'pos1'],
@@ -283,6 +293,10 @@ class MdsPlot():
                 data=[trace0, trace1, edge_trace], layout=layout)
         else:
             plot_fig = go.Figure(data=[trace0, trace1], layout=layout)
+        print(
+            'Finished!\n'
+            'Total time:{}'.format(datetime.now() - start)
+        )
         return plot_fig
 
 
@@ -290,7 +304,8 @@ if __name__ == '__main__':
     # Test script
     plot = MdsPlot()
     plot.data_retrieve(
-        path='../4EPK/T2.csv', size=(None, 23), descriptor='CH4_Del(65-5.8bar)'
+        path='../4EPK/T2.csv', size=(None, 23),
+        descriptors=['Structure', 'Final_lattice_E', 'CH4_Del(65-5.8bar)']
     )
     plot.affinity_propagation_cluster()
     plot.cluster_structure_selection(descriptor='Final_lattice_E')
