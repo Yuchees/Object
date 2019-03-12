@@ -32,7 +32,7 @@ class GaussianInout:
         self.header = './header_{}'.format(method)
         self.bash = './bash_template'
         # Molecular coordinators
-        self.mol_folder = '{}/{}/{}'.format(root_path, mol, seq)
+        self.mol_origin = '{}/{}/{}'.format(root_path, mol, seq)
         # Gaussian16 input and output folder
         self.input_folder = '{}/input_{}/{}'.format(
             root_path, method, self.mol_name)
@@ -42,11 +42,20 @@ class GaussianInout:
         self.origin_result_folder = ('{}/result'.format(self.output_folder))
         # Normal terminated results
         self.normal_result_folder = (
-                self.output_folder + '/{}_final'.format(self.mol_name)
+                self.output_folder + '/{}_out'.format(self.mol_name)
         )
+        self.mol_result = self.output_folder + '/{}_xyz'.format(self.mol_name)
         self.chk_path = (
             '%Chk=/users/psyche/volatile/gaussian/chk/{}/'.format(method)
         )
+        if not os.path.exists(self.input_folder.split('/{}'.format(mol))[0]):
+            os.mkdir(self.input_folder.split('/{}'.format(mol))[0])
+            if not os.path.exists(self.input_folder):
+                os.mkdir(self.input_folder)
+        if not os.path.exists(self.output_folder.split('/{}'.format(mol))[0]):
+            os.mkdir(self.output_folder.split('/{}'.format(mol))[0])
+            if not os.path.exists(self.output_folder):
+                os.mkdir(self.output_folder)
 
     def setup_result_folder(self, folder):
         """
@@ -86,7 +95,7 @@ class GaussianInout:
                 'Gaussian input:     {}/{}'.format(
                     self.header,
                     self.chk_path,
-                    self.mol_folder,
+                    self.mol_origin,
                     self.input_folder,
                     self.mol_name
                 )
@@ -136,7 +145,7 @@ class GaussianInout:
         with open(self.header, 'r') as header:
             template = header.readlines()
         # Generate Gaussian input data for all molecules
-        for file in os.listdir(self.mol_folder):
+        for file in os.listdir(self.mol_origin):
             input_data = template.copy()
             # Get the molecular name
             name = file.split('.')[0]
@@ -146,7 +155,7 @@ class GaussianInout:
                     input_data[i] = self.chk_path + '{}.chk\n'.format(name)
             # Read molecule file
             if geom == 'local':
-                molecular_file = self.mol_folder + '/' + file
+                molecular_file = self.mol_origin + '/' + file
                 with open(molecular_file, 'r') as data:
                     # Get all atoms coordinates
                     # For mol format
@@ -155,13 +164,13 @@ class GaussianInout:
                             segments = re.split(r'\s+', line)
                             try:
                                 if segments[4] in self.elements.values():
-                                    coord_line = '{}   {}  {}  {}'.format(
+                                    xyz_line = '{}{:>10}{:>10}{:>10}\n'.format(
                                         segments[4],
                                         segments[1],
                                         segments[2],
                                         segments[3]
                                     )
-                                    input_data.append(coord_line)
+                                    input_data.append(xyz_line)
                             except IndexError:
                                 pass
                     # For xyz format
@@ -184,7 +193,7 @@ class GaussianInout:
                     if line.startswith('# Geom'):
                         geom_line = True
                 if not geom_line:
-                    input_data.insert(4, '# Geom=Checkpoint Guess=Read')
+                    input_data.insert(4, '# Geom=Checkpoint Guess=Read\n')
             else:
                 print('Error! Geom must be local or chk.')
             # Writing data into a gjf file
@@ -234,8 +243,8 @@ class GaussianInout:
                         j += 1
         print(
             'Finished.\n'
-            'Normal results:            {}\n'
-            'Negative frequency result: {}\n'
+            'Normal terminated:         {}\n'
+            'Error result:              {}\n'
             'Total time:{}'.format(i, j, (datetime.now() - start))
         )
 
@@ -283,7 +292,7 @@ class GaussianInout:
 
     def prep_error_input(self, error):
         """
-        Generating input files for error and negative frequency results.\n
+        Generating input files for error and negative frequency results.
         Using prepared header information.
 
         :return: None
@@ -305,7 +314,7 @@ class GaussianInout:
                 elif input_data[i].startswith('# Geom'):
                     geom_line = True
             if not geom_line:
-                input_data.insert(4, '# Geom=Checkpoint Guess=Read')
+                input_data.insert(4, '# Geom=Checkpoint Guess=Read\n')
             # Creating folder and writing the input files
             error_input_folder = (self.input_folder + '/{}'.format(error))
             if not os.path.exists(error_input_folder):
@@ -362,9 +371,62 @@ class GaussianInout:
             os.removedirs(path + str(folder))
         print('Finished!')
 
+    def reading_opt_out_files(self):
+        for out_file in os.listdir(self.normal_result_folder):
+            final_step_line, energy_line = 0, 0
+            first_atom_line, last_atom_line = 0, 0
+            out_file_path = self.normal_result_folder + '/' + out_file
+            with open(out_file_path, 'r') as file:
+                lines = file.readlines()
+            # Finding the converged step position
+            for i in range(len(lines)):
+                if lines[i].startswith(' Optimization completed'):
+                    final_step_line = i
+                    break
+            # Finding the energy and coordinates position
+            for j in range(final_step_line - 1, -1, -1):
+                if 'SCF Done' in lines[j]:
+                    energy_line = j
+                if 'Coordinates (Angstroms)' in lines[j]:
+                    first_atom_line = j + 3
+                    for k in range(first_atom_line, final_step_line):
+                        if lines[k].startswith(' -'):
+                            last_atom_line = k - 1
+                            break
+                    break
+            # Reading the energy data
+            energy_str = re.split(r'\s+', lines[energy_line])[5]
+            if 'E' in energy_str:
+                energy_e = energy_str.split('E')
+                energy = float(energy_e[0]) * 10 ** int(energy_e[1])
+            else:
+                energy = energy_str
+            # Reading all coordinates data
+            atom_numbers = re.split(r'\s+', lines[last_atom_line])[1]
+            coordinate_lines = []
+            for n in range(first_atom_line, last_atom_line+1):
+                segments = re.split(r'\s+', lines[n])
+                coordinate_line = '{}{:>12}{:>12}{:>12}\n'.format(
+                    self.elements[int(segments[2])],
+                    segments[4],
+                    segments[5],
+                    segments[6]
+                )
+                coordinate_lines.append(coordinate_line)
+            # xyz format lines list
+            xyz_format_lines = ['{}\n'.format(atom_numbers),
+                                'Energy: {} A.U.\n'.format(energy)]
+            xyz_format_lines = xyz_format_lines + coordinate_lines
+            if not os.path.exists(self.mol_result):
+                os.mkdir(self.mol_result)
+            path = self.mol_result + '/{}.xyz'.format(out_file.split('.')[0])
+            with open(path, 'w') as mol_file:
+                mol_file.writelines(xyz_format_lines)
+
 
 if __name__ == '__main__':
-    gauss_function = GaussianInout(method='PM7_opt', mol='dyes', seq='dimer')
+    gauss_function = GaussianInout(method='PM7_opt', mol='dyes', seq='monomer')
     gauss_function.info('all')
     gauss_function.undistributed_files('../../Documents/test')
     gauss_function.distributed_files('../../Documents/test', 10)
+    gauss_function.reading_opt_out_files()
