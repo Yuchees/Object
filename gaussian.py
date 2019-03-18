@@ -14,7 +14,7 @@ class GaussianInout:
     """
     Gaussian 16 input and output files preparation function.
     """
-    def __init__(self, method, mol, seq, root_path='../../Documents'):
+    def __init__(self, method, mol, seq, root_path='../../SSD'):
         """
         :param method: DFT method
         :param mol: Molecule name
@@ -164,7 +164,7 @@ class GaussianInout:
                             segments = re.split(r'\s+', line)
                             try:
                                 if segments[4] in self.elements.values():
-                                    xyz_line = '{}{:>10}{:>10}{:>10}\n'.format(
+                                    xyz_line = '{}{:>14}{:>14}{:>14}\n'.format(
                                         segments[4],
                                         segments[1],
                                         segments[2],
@@ -359,7 +359,7 @@ class GaussianInout:
 
         :param path: The root folder
         :type path: str
-        :return:
+        :return: None
         """
         if not path.endswith('/'):
             path = path + '/'
@@ -371,7 +371,14 @@ class GaussianInout:
             os.removedirs(path + str(folder))
         print('Finished!')
 
-    def reading_opt_out_files(self):
+    def obtain_structure(self):
+        """
+        Obtain the final structure for  geometry optimisation result. The
+        formation energy is written in the second line as atom unit and saved
+        as an XYZ format file.
+
+        :return: None
+        """
         for out_file in os.listdir(self.normal_result_folder):
             final_step_line, energy_line = 0, 0
             first_atom_line, last_atom_line = 0, 0
@@ -406,7 +413,7 @@ class GaussianInout:
             coordinate_lines = []
             for n in range(first_atom_line, last_atom_line+1):
                 segments = re.split(r'\s+', lines[n])
-                coordinate_line = '{}{:>12}{:>12}{:>12}\n'.format(
+                coordinate_line = '{}{:>14}{:>14}{:>14}\n'.format(
                     self.elements[int(segments[2])],
                     segments[4],
                     segments[5],
@@ -425,8 +432,6 @@ class GaussianInout:
 
 
 if __name__ == '__main__':
-    gauss_function = GaussianInout(method='PM7_opt', mol='dyes', seq='monomer')
+    gauss_function = GaussianInout(method='PM7_opt', mol='dyes', seq='tetramer')
     gauss_function.info('all')
-    gauss_function.undistributed_files('../../Documents/test')
-    gauss_function.distributed_files('../../Documents/test', 10)
-    gauss_function.reading_opt_out_files()
+    gauss_function.obtain_structure()
