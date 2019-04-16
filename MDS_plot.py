@@ -15,7 +15,7 @@ from sklearn.cluster import AffinityPropagation
 
 
 # noinspection PyRedundantParentheses,PyUnboundLocalVariable
-class MdsPlot():
+class MdsPlot(object):
     """
     This class is used to proceed a plot after clustering and
     scaling methods.
