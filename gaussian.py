@@ -10,6 +10,7 @@ import re
 from datetime import datetime
 
 
+# noinspection PyMethodMayBeStatic
 class GaussianInout:
     """
     Gaussian 16 input and output files preparation function.
@@ -38,24 +39,24 @@ class GaussianInout:
             root_path, method, self.mol_name)
         self.output_folder = '{}/output_{}/{}'.format(
             root_path, method, self.mol_name)
-        # Error and negative frequency folder
         self.origin_result_folder = ('{}/result'.format(self.output_folder))
-        # Normal terminated results
+        # Normal terminated results folder
         self.normal_result_folder = (
                 self.output_folder + '/{}_out'.format(self.mol_name)
         )
+        # Molecule structure folder
         self.mol_result = self.output_folder + '/{}_xyz'.format(self.mol_name)
         self.chk_path = (
             '%Chk=/users/psyche/volatile/gaussian/chk/{}/'.format(method)
         )
-        if not os.path.exists(self.input_folder.split('/{}'.format(mol))[0]):
-            os.mkdir(self.input_folder.split('/{}'.format(mol))[0])
-            if not os.path.exists(self.input_folder):
-                os.mkdir(self.input_folder)
-        if not os.path.exists(self.output_folder.split('/{}'.format(mol))[0]):
-            os.mkdir(self.output_folder.split('/{}'.format(mol))[0])
-            if not os.path.exists(self.output_folder):
-                os.mkdir(self.output_folder)
+        if not os.path.exists(self.input_folder):
+            os.makedirs(self.input_folder)
+        if not os.path.exists(self.origin_result_folder):
+            os.makedirs(self.origin_result_folder)
+        if not os.path.exists(self.normal_result_folder):
+            os.makedirs(self.normal_result_folder)
+        if not os.path.exists(self.mol_result):
+            os.makedirs(self.mol_result)
 
     def setup_result_folder(self, folder):
         """
@@ -123,13 +124,12 @@ class GaussianInout:
                 'error_input.'
             )
 
-    def prep_input(self, geom):
+    def prep_input(self, geometry):
         """
         Generate gaussian input files.\n
-        All chemical files must be stored under self.check_target_folder
-        folder.\n
-        Header information read from self.header file.\n
-        Checkpoint file path got from self.chk_path variable and named
+        All chemical files must be stored under self.input_folder.\n
+        Header information is read from self.header file.\n
+        Checkpoint file path is read from self.chk_path variable and named
         as same as the molecule file.
 
         :return: None
@@ -138,10 +138,8 @@ class GaussianInout:
         start = datetime.now()
         # Create folders for origin Gaussian input files
         input_origin_folder = self.input_folder + '/{}'.format(self.mol_name)
-        if not os.path.exists(self.input_folder):
-            os.mkdir(self.input_folder)
         if not os.path.exists(input_origin_folder):
-            os.mkdir(input_origin_folder)
+            os.makedirs(input_origin_folder)
         with open(self.header, 'r') as header:
             template = header.readlines()
         # Generate Gaussian input data for all molecules
@@ -154,11 +152,11 @@ class GaussianInout:
                 if input_data[i].startswith('%Chk'):
                     input_data[i] = self.chk_path + '{}.chk\n'.format(name)
             # Read molecule file
-            if geom == 'local':
+            if geometry == 'local':
                 molecular_file = self.mol_origin + '/' + file
                 with open(molecular_file, 'r') as data:
                     # Get all atoms coordinates
-                    # For mol format
+                    # Mol format
                     if file.endswith('.mol'):
                         for line in data:
                             segments = re.split(r'\s+', line)
@@ -173,7 +171,7 @@ class GaussianInout:
                                     input_data.append(xyz_line)
                             except IndexError:
                                 pass
-                    # For xyz format
+                    # XYZ format
                     elif file.endswith('.xyz'):
                         for line in data:
                             try:
@@ -187,7 +185,7 @@ class GaussianInout:
                         break
                 # Adding terminate line
                 input_data.append('\n')
-            elif geom == 'chk':
+            elif geometry == 'chk':
                 geom_line = False
                 for line in input_data:
                     if line.startswith('# Geom'):
@@ -195,7 +193,7 @@ class GaussianInout:
                 if not geom_line:
                     input_data.insert(4, '# Geom=Checkpoint Guess=Read\n')
             else:
-                print('Error! Geom must be local or chk.')
+                print('Error! Geometry must be local or chk.')
             # Writing data into a gjf file
             input_path = '{}/{}.gjf'.format(input_origin_folder, name)
             with open(input_path, 'w') as input_file:
@@ -204,9 +202,9 @@ class GaussianInout:
 
     def error_screening(self):
         """
-        Checking the output files and distributing error files into different
-        folder.\n
-        Error folders are automatically created and named by the error number.
+        Checking the output files and distributing unfinished amd error files
+        into different folder.\n
+        Error folders are automatically created and named by the error type.
 
         :return: None
         """
@@ -214,6 +212,7 @@ class GaussianInout:
         print('Targeted folder: {}'.format(self.origin_result_folder))
         start = datetime.now()
         i, j = 0, 0
+        error_type = []
         for file in os.listdir(self.origin_result_folder):
             if not file.endswith('.out'):
                 print('Error!\n{} is not a Gaussian out file!'.format(file))
@@ -223,29 +222,30 @@ class GaussianInout:
                 lines = gauss_out.readlines()
                 # Checking the ending line
                 if not re.match(r' File| Normal', lines[-1]):
-                    unfinished = self.origin_result_folder + '/../unfinished'
+                    unfinished = self.output_folder + '/unfinished'
                     if not os.path.exists(unfinished):
                         os.mkdir(unfinished)
                     shutil.move(path, unfinished)
                     i += 1
                 else:
                     error_line = lines[-4:-3][0]
-                # Checking the error indicator
+                    # Checking the error indicator
                     if error_line.startswith(' Error termination'):
                         error = re.split(r'[/.]', error_line)[-3][1:]
-                        # Creating a new folder for different
-                        # categories of error
+                        if error not in error_type:
+                            error_type.append(error)
+                        # Creating a new folder for different error type
                         error_folder = self.output_folder + '/error_' + error
                         if not os.path.exists(error_folder):
                             os.mkdir(error_folder)
-                            print(error_folder)
                         shutil.move(path, error_folder)
                         j += 1
         print(
             'Finished.\n'
-            'Normal terminated:         {}\n'
-            'Error result:              {}\n'
-            'Total time:{}'.format(i, j, (datetime.now() - start))
+            'Unfinished:             {}\n'
+            'Error result:           {}\n'
+            'Error categories:       {}\n'
+            'Total time:{}'.format(i, j, error_type, (datetime.now() - start))
         )
 
     def neg_freq_screening(self):
@@ -270,17 +270,15 @@ class GaussianInout:
                         data = re.split(r'\s+', line)
                         # Normal terminated jobs
                         if float(data[3]) > 0:
-                            if not os.path.exists(self.normal_result_folder):
-                                os.mkdir(self.normal_result_folder)
                             shutil.move(path, self.normal_result_folder)
                             i += 1
                             break
                         # Negative frequencies
                         elif float(data[3]) < 0:
-                            error_folder = self.output_folder + '/neg_freq'
-                            if not os.path.exists(error_folder):
-                                os.mkdir(error_folder)
-                            shutil.move(path, error_folder)
+                            neg_folder = self.output_folder + '/neg_freq'
+                            if not os.path.exists(neg_folder):
+                                os.mkdir(neg_folder)
+                            shutil.move(path, neg_folder)
                             j += 1
                             break
         print(
@@ -322,9 +320,12 @@ class GaussianInout:
             error_input_file = error_input_folder + '/{}.gjf'.format(name)
             with open(error_input_file, 'w') as input_file:
                 input_file.writelines(input_data)
-        print('Finished. Total time:{}'.format(datetime.now() - start))
+        print(
+            'Finished.\n'
+            'Total time:{}'.format(datetime.now() - start)
+        )
 
-    def distributed_files(self, path, number):
+    def files_distribution(self, path, number):
         """
         Distributed files into sub folders that can be applied for array jobs on
         barkla.
@@ -353,7 +354,7 @@ class GaussianInout:
         print('Finished!\n'
               'Distributed into {} folders.'.format((i - 1)))
 
-    def undistributed_files(self, path):
+    def files_redistribution(self, path):
         """
         Collecting all sub-folders files to their root folder.
 
@@ -379,6 +380,7 @@ class GaussianInout:
 
         :return: None
         """
+        print('Start...')
         for out_file in os.listdir(self.normal_result_folder):
             final_step_line, energy_line = 0, 0
             first_atom_line, last_atom_line = 0, 0
@@ -390,7 +392,7 @@ class GaussianInout:
                 if lines[i].startswith(' Optimization completed'):
                     final_step_line = i
                     break
-            # Finding the energy and coordinates position
+            # Finding the energy and all coordinates position
             for j in range(final_step_line - 1, -1, -1):
                 if 'SCF Done' in lines[j]:
                     energy_line = j
@@ -408,27 +410,33 @@ class GaussianInout:
                 energy = float(energy_e[0]) * 10 ** int(energy_e[1])
             else:
                 energy = energy_str
-            # Reading all coordinates data
+            # Reading the last atom
             atom_numbers = re.split(r'\s+', lines[last_atom_line])[1]
+            # Reading and adding coordinates data into the list
             coordinate_lines = []
             for n in range(first_atom_line, last_atom_line+1):
                 segments = re.split(r'\s+', lines[n])
                 coordinate_line = '{}{:>14}{:>14}{:>14}\n'.format(
+                    # Element
                     self.elements[int(segments[2])],
+                    # X, Y, Z coordinates
                     segments[4],
                     segments[5],
                     segments[6]
                 )
                 coordinate_lines.append(coordinate_line)
             # xyz format lines list
-            xyz_format_lines = ['{}\n'.format(atom_numbers),
-                                'Energy: {} A.U.\n'.format(energy)]
-            xyz_format_lines = xyz_format_lines + coordinate_lines
-            if not os.path.exists(self.mol_result):
-                os.mkdir(self.mol_result)
-            path = self.mol_result + '/{}.xyz'.format(out_file.split('.')[0])
+            name = out_file.split('.')[0]
+            xyz_title_lines = ['{}\n'.format(atom_numbers),
+                               '{} Energy: {} A.U.\n'.format(name, energy)]
+            xyz_format_lines = xyz_title_lines + coordinate_lines
+            path = self.mol_result + '/{}.xyz'.format(name)
             with open(path, 'w') as mol_file:
                 mol_file.writelines(xyz_format_lines)
+        print(
+            'Finished.\n'
+            'XYZ format files in:  {}'.format(self.mol_result)
+        )
 
 
 if __name__ == '__main__':
