@@ -58,26 +58,6 @@ class GaussianInout:
         if not os.path.exists(self.mol_result):
             os.makedirs(self.mol_result)
 
-    def setup_result_folder(self, folder):
-        """
-        Setting targeted folder path.
-
-        :param folder: The path for targeted folder.
-        :return: None
-        """
-        if folder.endswith('/'):
-            folder = folder[:-1]
-        self.origin_result_folder = folder
-
-    def setup_chk_path(self, chk_path):
-        """
-        Editing default checkpoint information for input files.
-
-        :param chk_path: The chk line in gaussian header
-        :return: None
-        """
-        self.chk_path = chk_path
-
     def info(self, info):
         """
         Print variables for different function.
