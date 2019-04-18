@@ -13,4 +13,4 @@ class FilesIO(GaussianInout):
         super().__init__(method, mol, seq)
 
     def read_files(self):
-
+        pass

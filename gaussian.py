@@ -93,9 +93,8 @@ class GaussianInout:
             print(
                 'Error input folder: {}\n'
                 'Error check folder: {}'.format(
-                    (self.input_folder + '/' +
-                     self.origin_result_folder.split('/')[-1]),
-                    self.origin_result_folder
+                    self.input_folder + '/error...',
+                    self.output_folder + '/error...'
                 )
             )
         if info not in ['all', 'input', 'neg', 'error', 'error_input']:
@@ -361,53 +360,39 @@ class GaussianInout:
         :return: None
         """
         print('Start...')
+        start = datetime.now()
         for out_file in os.listdir(self.normal_result_folder):
-            final_step_line, energy_line = 0, 0
-            first_atom_line, last_atom_line = 0, 0
+            # Parameters initialisation
+            result_ending, result_starting = 0, 0
+            find_hf, final_result, coordinate_lines = False, '', []
             out_file_path = self.normal_result_folder + '/' + out_file
             with open(out_file_path, 'r') as file:
                 lines = file.readlines()
-            # Finding the converged step position
-            for i in range(len(lines)):
-                if lines[i].startswith(' Optimization completed'):
-                    final_step_line = i
+            # Finding the starting and ending point for final result
+            for j in range(len(lines)-1, -1, -1):
+                if ('HF=' in lines[j]) or ('Version=' in lines[j]):
+                    result_ending = j + 1
+                    find_hf = True
+                elif find_hf and lines[j] == '\n':
+                    result_starting = j + 2
                     break
-            # Finding the energy and all coordinates position
-            for j in range(final_step_line - 1, -1, -1):
-                if 'SCF Done' in lines[j]:
-                    energy_line = j
-                if 'Coordinates (Angstroms)' in lines[j]:
-                    first_atom_line = j + 3
-                    for k in range(first_atom_line, final_step_line):
-                        if lines[k].startswith(' -'):
-                            last_atom_line = k - 1
-                            break
-                    break
-            # Reading the energy data
-            energy_str = re.split(r'\s+', lines[energy_line])[5]
-            if 'E' in energy_str:
-                energy_e = energy_str.split('E')
-                energy = float(energy_e[0]) * 10 ** int(energy_e[1])
-            else:
-                energy = energy_str
-            # Reading the last atom
-            atom_numbers = re.split(r'\s+', lines[last_atom_line])[1]
-            # Reading and adding coordinates data into the list
-            coordinate_lines = []
-            for n in range(first_atom_line, last_atom_line+1):
-                segments = re.split(r'\s+', lines[n])
-                coordinate_line = '{}{:>14}{:>14}{:>14}\n'.format(
-                    # Element
-                    self.elements[int(segments[2])],
-                    # X, Y, Z coordinates
-                    segments[4],
-                    segments[5],
-                    segments[6]
+            for i in range(result_starting, result_ending+1):
+                final_result += lines[i][1:-1]
+            result_list = final_result.split('\\\\')
+            energy = re.search('HF=-?[0-9]+.[0-9]+', result_list[4]).group(0)
+            for coordinate in result_list[3].split('\\')[1:]:
+                segments = coordinate.split(',')
+                coordinate_line = '{}{:>20}{:>20}{:>20}\n'.format(
+                    # Element and coordinates
+                    segments[0],
+                    segments[1],
+                    segments[2],
+                    segments[3]
                 )
                 coordinate_lines.append(coordinate_line)
             # xyz format lines list
             name = out_file.split('.')[0]
-            xyz_title_lines = ['{}\n'.format(atom_numbers),
+            xyz_title_lines = ['{}\n'.format(len(coordinate_lines)),
                                '{} Energy: {} A.U.\n'.format(name, energy)]
             xyz_format_lines = xyz_title_lines + coordinate_lines
             path = self.mol_result + '/{}.xyz'.format(name)
@@ -415,11 +400,12 @@ class GaussianInout:
                 mol_file.writelines(xyz_format_lines)
         print(
             'Finished.\n'
-            'XYZ format files in:  {}'.format(self.mol_result)
+            'XYZ format files in:  {}\n'
+            'Total time:{}'.format(self.mol_result, (datetime.now() - start))
         )
 
 
 if __name__ == '__main__':
     gauss_function = GaussianInout(method='PM7_opt', mol='dyes', seq='tetramer')
     gauss_function.info('all')
-    gauss_function.obtain_structure()
+    # gauss_function.obtain_structure()
