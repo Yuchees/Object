@@ -370,11 +370,11 @@ class GaussianInout:
                 lines = file.readlines()
             # Finding the starting and ending point for final result
             for j in range(len(lines)-1, -1, -1):
-                if ('HF=' in lines[j]) or ('Version=' in lines[j]):
+                if ('State=' in lines[j]) or ('Version=' in lines[j]):
                     result_ending = j + 1
                     find_hf = True
-                elif find_hf and lines[j] == '\n':
-                    result_starting = j + 2
+                elif find_hf and lines[j].startswith(' 1\\1\\'):
+                    result_starting = j
                     break
             for i in range(result_starting, result_ending+1):
                 final_result += lines[i][1:-1]
@@ -406,6 +406,6 @@ class GaussianInout:
 
 
 if __name__ == '__main__':
-    gauss_function = GaussianInout(method='PM7_opt', mol='dyes', seq='tetramer')
+    gauss_function = GaussianInout(method='PM7_IP_EA', mol='dyes', seq='tetramer')
     gauss_function.info('all')
-    # gauss_function.obtain_structure()
+    gauss_function.obtain_structure()
