@@ -1,7 +1,7 @@
 #!/usr/bin/env python3
 # -*- coding: utf-8 -*-
 """
-
+Functions for managing SMILES dataframe.
 @author: Yu Che
 """
 import yaml
@@ -32,7 +32,7 @@ def read_characters(path):
 
 def generate_canon_smi(df, origin_smile_column):
     """
-    Converted origin SMILES to canonical SMILES and saved them into
+    Converting origin SMILES into canonical SMILES and saving them into
     the 'canonical_smi' column.
 
     :param df: The input dataframe
@@ -52,7 +52,7 @@ def generate_canon_smi(df, origin_smile_column):
             canonical_smi = Chem.MolToSmiles(
                 Chem.MolFromSmiles(smile), canonical=True
             )
-        except:
+        except Exception:
             raise ValueError(
                 'Please check the incorrect SMILES: {}'.format(smile)
             )
@@ -66,6 +66,8 @@ def smiles_to_one_hot(df, characters):
 
     :param df: The input dataframe
     :param characters: The list of characters
+    :type df: pandas.core.frame.DataFrame
+    :type characters: list
     :return: The embedded matrix
     :rtype: numpy.ndarray
     """
@@ -93,12 +95,17 @@ def smiles_to_one_hot(df, characters):
     return smiles_matrix
 
 
+# noinspection PyTypeChecker
 def one_hot_to_smiles(smiles_matrix, characters):
     """
+    Converting one-hot embedding matrix to SMILES list.
 
     :param smiles_matrix:
     :param characters:
-    :return:
+    :type smiles_matrix: np.ndarray
+    :type characters: list
+    :return: SMILES list
+    :rtype: list
     """
     smiles_list = []
     for one_hot_matrix in smiles_matrix:
@@ -108,3 +115,4 @@ def one_hot_to_smiles(smiles_matrix, characters):
             smile_temp += characters[index]
         smiles_list.append(smile_temp)
     return smiles_list
+
