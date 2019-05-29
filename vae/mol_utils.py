@@ -60,6 +60,25 @@ def generate_canon_smi(df, origin_smile_column):
     print('Finished. Total time:{}'.format(datetime.now() - start))
 
 
+def padding_smile(smile, max_len, padding='all'):
+    """
+
+    :param smile:
+    :param max_len:
+    :param padding:
+    :return:
+    """
+    if len(smile) <= max_len:
+        if padding == 'all':
+            return smile + ' ' * (max_len - len(smile))
+        elif padding == 'last':
+            return smile + ' '
+        elif padding == 'none':
+            return smile
+        else:
+            raise ValueError
+
+
 def smiles_to_one_hot(df, characters):
     """
     Character level one-hot embedding
@@ -115,4 +134,3 @@ def one_hot_to_smiles(smiles_matrix, characters):
             smile_temp += characters[index]
         smiles_list.append(smile_temp)
     return smiles_list
-
