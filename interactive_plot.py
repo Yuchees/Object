@@ -1,7 +1,8 @@
 #!/usr/bin/env python3
 # -*- coding: utf-8 -*-
 """
-
+Interactive 2D molecular structure visualisation application
+Using T-SNE for dimensionality reduction
 @author: Yu Che
 """
 import dash
@@ -98,4 +99,4 @@ def display_selected_data(selectedData):
 
 
 if __name__ == '__main__':
-    app.run_server(host='0.0.0.0', prot=8050)
+    app.run_server(host='0.0.0.0')

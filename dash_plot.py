@@ -1,8 +1,9 @@
 #!/usr/bin/env python3
 """
 -*- coding: utf-8 -*-
-Author:Yu Che
-Dash 2D&3D plot
+Interactive 2D&3D local dataset visualisation application
+Dataset retrieved form MongoDB
+@author: Yu Che
 """
 import dash
 import dash_core_components as dcc
